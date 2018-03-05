@@ -7,6 +7,7 @@ enter the vagrant up command in the folder you've copied the files into.
  ```vagrant up```
 
 ***Minecraft Server Connect***
+
 connect to your minecraft server with the port 25565.
 
 enjoy.
