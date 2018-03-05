@@ -1,0 +1,59 @@
+#!/bin/bash
+set -e
+set -x
+
+
+TRAVIS=$1
+
+
+VERSION='https://s3.amazonaws.com/Minecraft.Download/versions/1.8/minecraft_server.1.8.jar'
+WORK_DIR='/opt/minecraft'
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y --no-install-recommends openjdk-6-jre-headless
+
+
+if [[ -z "${TRAVIS}" ]]; then
+  ln -s /vagrant/persistent_files ${WORK_DIR}
+fi
+
+test -d ${WORK_DIR}/logs || mkdir -p ${WORK_DIR}/logs
+pushd ${WORK_DIR}
+
+HEADER='Referer: https://github.com/stephendotexe/vagrant_minecraft_auto_launch'
+test -f "${VERSION}" || wget --header=${HEADER} --quiet "${VERSION}"
+
+# Upstart manages the server process
+cat > /etc/init/minecraft.conf <<MINECRAFT_CONF
+# Minecraft upstart script
+
+start on (local-filesystems and net-device-up IFACE!=lo)
+stop on [!12345]
+
+respawn
+
+chdir ${WORK_DIR}
+
+exec java -jar minecraft_server.1.8.jar nogui > /opt/minecraft/logs/service.log 2>&1
+MINECRAFT_CONF
+
+
+cat > /etc/logrotate.d/minecraft <<MINECRAFT_LOGROTATE
+${WORK_DIR}/logs/service.log {
+  rotate 24
+  weekly
+  compress
+  notifempty
+  copytruncate
+}
+MINECRAFT_LOGROTATE
+
+
+cat > ${WORK_DIR}/eula.txt <<EULA
+
+eula=TRUE
+EULA
+
+initctl reload-configuration
+service minecraft start
