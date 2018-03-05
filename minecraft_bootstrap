@@ -6,8 +6,11 @@ set -x
 TRAVIS=$1
 
 
+
+
 VERSION='https://s3.amazonaws.com/Minecraft.Download/versions/1.8/minecraft_server.1.8.jar'
 WORK_DIR='/opt/minecraft'
+
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
@@ -21,10 +24,11 @@ fi
 test -d ${WORK_DIR}/logs || mkdir -p ${WORK_DIR}/logs
 pushd ${WORK_DIR}
 
+
 HEADER='Referer: https://github.com/stephendotexe/vagrant_minecraft_auto_launch'
 test -f "${VERSION}" || wget --header=${HEADER} --quiet "${VERSION}"
 
-# Upstart manages the server process
+
 cat > /etc/init/minecraft.conf <<MINECRAFT_CONF
 # Minecraft upstart script
 
@@ -35,7 +39,7 @@ respawn
 
 chdir ${WORK_DIR}
 
-exec java -jar minecraft_server.1.8.jar nogui > /opt/minecraft/logs/service.log 2>&1
+exec java -Xmx1024M -Xms1024M -jar minecraft_server.1.8.jar nogui > /opt/minecraft/logs/service.log 2>&1
 MINECRAFT_CONF
 
 
@@ -51,9 +55,44 @@ MINECRAFT_LOGROTATE
 
 
 cat > ${WORK_DIR}/eula.txt <<EULA
-
+# By changing the setting below to TRUE you are indicating your agreement to our EULA (https://account.mojang.com/documents/minecraft_eula).
 eula=TRUE
 EULA
 
 initctl reload-configuration
 service minecraft start
+
+
+test -f /etc/motd.tail && rm /etc/motd.tail
+test -f /etc/update-motd.d/* && rm -r -- /etc/update-motd.d/*
+cat > /etc/update-motd.d/00-header <<'DONE'
+#!/bin/bash
+
+GREEN='\e[0;32m'
+LBLUE='\e[1;34m'
+RESET='\e[0m'
+echo -e "
+${LBLUE}WELCOME TO MINECRAFT!
+
+To stop, start, restart or check the status of the the minecraft server
+process, simply run:${RESET}
+${GREEN}
+  $ service minecraft <stop|start|restart|status>${RESET}
+${LBLUE}
+The runtime logs are available at /opt/minecraft/logs
+
+To change the min or max server memory values, make the change in:${RESET}
+${GREEN}
+  /etc/init/minecraft.conf${RESET}
+${LBLUE}
+And then restart the server proces.
+
+Status of minecraft server:${RESET}
+
+${GREEN}$(service minecraft status)${RESET}
+
+${LBLUE}Have fun!${RESET}"
+DONE
+
+chmod +x /etc/update-motd.d/00-header
+chmod 755 /etc/update-motd.d/00-header
